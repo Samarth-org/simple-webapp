@@ -1,0 +1,47 @@
+# ================================================================
+# FILE    : .github/workflows/simple-webapp-build.yml
+# REPO    : https://github.com/Samarth-org/simple-webapp
+#
+# TEAMCITY SUB-PROJECT : WebAppProject / Simple Webapp
+# BUILD CONFIG         : WebAppProject_SimpleWebapp_Build → "Build"
+#
+# MAPPING REFERENCE:
+#   TeamCity              GitHub Actions
+#   ─────────────────     ──────────────────────────
+#   Sub-project           Separate workflow file in same repo
+#   vcsTrigger +: *       on: push: branches: ['**']
+#   simpleRunner (echo)   run: echo
+# ================================================================
+
+name: Simple Webapp - Build
+
+on:
+  push:
+    branches:
+      - '**'       # vcsTrigger +: * (all branches)
+  workflow_dispatch:
+
+jobs:
+
+# ================================================================
+# JOB 1 ── Build
+# TeamCity ID : WebAppProject_SimpleWebapp_Build
+# Trigger     : vcsTrigger +: *
+# Snap Dep    : NONE
+# Art Dep     : NONE
+# Params      : NONE
+# ================================================================
+  build:
+    name: "Build"
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # VCS Root: https://github.com/Samarth-org/simple-webapp.git → main
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # ── Step 1: simpleRunner ────────────────────────────────
+      # echo "This is step from sb2-bc1"
+      - name: "Step 1 - Simple Build Step"
+        run: echo "This is step from sb2-bc1"
