@@ -1,7 +1,14 @@
 package com.example;
 
+/**
+ * Simple Web App Entry Point.
+ */
 public class App {
     public static void main(String[] args) {
-        System.out.println("Hello from TeamCity CI/CD..!");
+        System.out.println("Hello, TeamCity CI/CD!");
+    }
+
+    public String getGreeting() {
+        return "Hello World";
     }
 }
