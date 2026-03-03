@@ -1,12 +1,11 @@
-# Use an OpenJDK Runtime as the base image
-FROM openjdk:17-jdk-slim
+# Use a valid, supported OpenJDK 17 image
+FROM eclipse-temurin:17-jdk-alpine
 
-# Set the working directory inside the container
+# Set the working directory
 WORKDIR /app
 
-# Copy the JAR file from the TeamCity 'target' folder into the container
-# Note: We use the wildcard to match your specific JAR name
+# Copy the JAR file from the target folder
 COPY target/*.jar app.jar
 
-# Command to run the application
+# Run the app
 ENTRYPOINT ["java", "-jar", "app.jar"]
