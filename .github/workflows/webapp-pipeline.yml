@@ -3,22 +3,21 @@ name: WebApp CI/CD Pipeline
 on:
   push:
     branches:
-      - main       # Compile & Unit Test → vcsTrigger +: main
-      - '**'       # Dockerize & Push + Deploy → vcsTrigger +: *
+      - main
+      - '**'
   workflow_dispatch:
 
 jobs:
+
   compile-and-test:
     name: "Compile & Unit Test"
     runs-on: ubuntu-latest
 
     steps:
 
-      # VCS Root: https://github.com/Samarth-org/simple-webapp.git → main
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Maven requires Java — TeamCity used %teamcity.tool.maven.DEFAULT%
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -26,43 +25,28 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # ── Step 1: Maven2 ─────────────────────────────────────
-      # goals: clean checkstyle:check package -Dcheckstyle.failOnViolation=false
-      # pomLocation: pom.xml
-      # JaCoCo coverage: +: *
       - name: "Step 1 - Checkstyle and Package"
         run: mvn clean checkstyle:check package -Dcheckstyle.failOnViolation=false
 
-      # ── Step 2: Maven2 ─────────────────────────────────────
-      # goals: test
-      # JaCoCo coverage enabled
       - name: "Step 2 - Run Unit Tests"
         run: mvn test
 
-      # ── Step 3: Maven2 ─────────────────────────────────────
-      # goals: package -DskipTests
       - name: "Step 3 - Package (Skip Tests)"
         run: mvn package -DskipTests
 
-      # ── Step 4: simpleRunner ────────────────────────────────
-      # echo "Build Version: %build.number%"
       - name: "Step 4 - Print Build Version"
-        run: echo "Build Version: ${{ github.run_number }}"
+        run: echo "Build Version ${{ github.run_number }}"
 
-      # Upload target/*.jar so Dockerize & Push job can consume it
-      # TeamCity: artifact path target/*.jar
       - name: Upload JAR Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-jar-${{ github.run_number }}
+          name: app-jar
           path: target/*.jar
           retention-days: 7
 
   dockerize-and-push:
     name: "Dockerize & Push"
     runs-on: ubuntu-latest
-
-    # TeamCity: Snapshot Dependency on Compile & Unit Test
     needs: compile-and-test
 
     steps:
@@ -70,34 +54,21 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # TeamCity: Artifact Dependency
-      # pathRules: target/*.jar => target/
-      # revisionName: sameChainOrLastFinished
       - name: Download JAR Artifact
         uses: actions/download-artifact@v4
         with:
-          name: app-jar-${{ github.run_number }}
+          name: app-jar
           path: target/
 
-      # ── Step 1: simpleRunner ────────────────────────────────
-      # ls -l target/  → verifies artifact exists before Docker build
-      - name: "Step 1 - Verify Artifact in target/"
+      - name: "Step 1 - Verify Artifact in target"
         run: ls -l target/
 
-      # ── Step 2: DockerCommand (build) ───────────────────────
-      # docker.image.namesAndTags: %DOCKER_USERNAME%/simple-webapp:%build.number%
-      # command.args: --pull
-      # dockerfile.path: Dockerfile
-      # dockerfile.contextDir: .
       - name: "Step 2 - Build Docker Image"
         run: |
           docker build --pull \
             -t ${{ secrets.DOCKER_USERNAME }}/simple-webapp:${{ github.run_number }} \
             -f Dockerfile .
 
-      # ── Step 3: DockerCommand (push) ────────────────────────
-      # docker.image.namesAndTags: %DOCKER_USERNAME%/simple-webapp:%build.number%
-      # docker.push.remove.image: true
       - name: "Step 3 - Push Docker Image"
         run: |
           echo "${{ secrets.DOCKER_PASSWORD }}" | \
@@ -105,18 +76,10 @@ jobs:
           docker push \
             ${{ secrets.DOCKER_USERNAME }}/simple-webapp:${{ github.run_number }}
 
-
   deploy-to-staging:
     name: "Deploy to Staging"
     runs-on: ubuntu-latest
-
-    # TeamCity: Snapshot Dependency on Dockerize & Push
-    # TeamCity: buildDependencyTrigger → afterSuccessfulBuildOnly: true
-    # This job only runs if dockerize-and-push succeeds
     needs: dockerize-and-push
-
-    # GitHub Environment — configure manual approval gate if needed
-    # Repo → Settings → Environments → staging → Required reviewers
     environment: staging
 
     steps:
@@ -124,24 +87,17 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # ── Step 1: simpleRunner ────────────────────────────────
-      # docker pull %DOCKER_USERNAME%/simple-webapp:%build.number%
       - name: "Step 1 - Pull Docker Image"
         run: |
           docker pull \
             ${{ secrets.DOCKER_USERNAME }}/simple-webapp:${{ github.run_number }}
 
-      # ── Step 2: simpleRunner ────────────────────────────────
-      # docker run -d -p 8080:8080 --name webapp-run ...
       - name: "Step 2 - Run Docker Container"
         run: |
           docker run -d -p 8080:8080 \
             --name webapp-run \
             ${{ secrets.DOCKER_USERNAME }}/simple-webapp:${{ github.run_number }}
 
-      # ── Step 3: simpleRunner ────────────────────────────────
-      # curl -I http://localhost:8080
-      # sleep added — container needs time to start before health check
       - name: "Step 3 - Verify Application is Running"
         run: |
           sleep 10
